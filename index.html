@@ -2144,53 +2144,9 @@
     });
   });
 
-  /* Project cards — stagger up */
-  gsap.utils.toArray('.proj-card').forEach(function(el, i) {
-    gsap.from(el, {
-      scrollTrigger: { trigger: el, start: 'top 92%' },
-      y: 50,
-      opacity: 0,
-      duration: 0.7,
-      delay: (i % 3) * 0.12,
-      ease: 'power2.out',
-    });
-  });
-
-  /* Timeline items — slide from left */
-  gsap.utils.toArray('.tl-item').forEach(function(el, i) {
-    gsap.from(el, {
-      scrollTrigger: { trigger: el, start: 'top 88%' },
-      x: -40,
-      opacity: 0,
-      duration: 0.75,
-      delay: i * 0.15,
-      ease: 'power3.out',
-    });
-  });
-
-  /* Cert items — stagger fade up in pairs */
-  gsap.utils.toArray('.cert-item').forEach(function(el, i) {
-    gsap.from(el, {
-      scrollTrigger: { trigger: el, start: 'top 92%' },
-      y: 30,
-      opacity: 0,
-      duration: 0.55,
-      delay: (i % 4) * 0.08,
-      ease: 'power2.out',
-    });
-  });
-
-  /* Stat cells — pop in */
-  gsap.utils.toArray('.stat-cell').forEach(function(el, i) {
-    gsap.from(el, {
-      scrollTrigger: { trigger: el, start: 'top 90%' },
-      y: 20,
-      opacity: 0,
-      duration: 0.55,
-      delay: i * 0.1,
-      ease: 'back.out(1.4)',
-    });
-  });
+  /* .proj-card, .tl-item, .cert-item, .stat-cell all use the
+     IntersectionObserver .reveal system — removing GSAP from()
+     on those to prevent inline-style opacity:0 overriding .visible */
 
 })();
 </script>
