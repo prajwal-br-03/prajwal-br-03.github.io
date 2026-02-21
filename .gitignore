@@ -1,0 +1,13 @@
+# Reference project — not part of this portfolio site
+3d-portfolio/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
