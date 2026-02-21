@@ -1003,6 +1003,62 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }
+
+    /* ─── THREE.JS CANVAS ────────────────────────────────── */
+    #hero-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    #hero .hero-bg-grid,
+    #hero .hero-bg-glow,
+    #hero .hero-stripe,
+    #hero .hero-arc { z-index: 2; }
+    #hero .hero-content  { position: relative; z-index: 3; }
+    #hero .hero-scroll-hint { z-index: 3; }
+
+    /* ─── HUD SCANLINE ───────────────────────────────────── */
+    .hero-scanline {
+      position: absolute;
+      left: 0; right: 0; height: 2px;
+      background: linear-gradient(to right,
+        transparent 0%,
+        rgba(239,223,0,0.18) 30%,
+        rgba(239,223,0,0.35) 50%,
+        rgba(239,223,0,0.18) 70%,
+        transparent 100%);
+      pointer-events: none;
+      z-index: 4;
+      animation: scanline 6s linear infinite;
+    }
+    @keyframes scanline {
+      0%   { top: 0%;   opacity: 0; }
+      5%   { opacity: 1; }
+      95%  { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* ─── VANILLA TILT ───────────────────────────────────── */
+    .proj-card, .skill-cat, .edu-card,
+    .pub-block, .lead-block {
+      will-change: transform;
+      transform-style: preserve-3d;
+    }
+    /* Glare overlay style */
+    .js-tilt-glare-inner {
+      background: linear-gradient(
+        0deg,
+        rgba(255,255,255,0) 0%,
+        rgba(239,223,0,0.06) 100%
+      ) !important;
+    }
+
+    /* ─── GSAP EXTRAS ────────────────────────────────────── */
+    /* Initial hidden state handled by GSAP — remove CSS opacity:0
+       from section titles so GSAP controls them */
+    .section-title, .section-label { will-change: transform, opacity; }
   </style>
 </head>
 
@@ -1040,6 +1096,8 @@
 
 <!-- ═══════════════════════════════════════ HERO ══ -->
 <section id="hero">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-scanline" aria-hidden="true"></div>
   <div class="hero-bg-grid"></div>
   <div class="hero-bg-glow"></div>
   <div class="hero-stripe"></div>
@@ -1834,6 +1892,307 @@
       el.classList.add('visible');
     });
   }
+</script>
+
+<!-- ═══ 3D LIBRARIES ═════════════════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   THREE.JS — Hero 3D Scene
+   Floating wireframe diamond shapes (Renault octahedra)
+   + particle field + mouse parallax
+══════════════════════════════════════════════════════════ */
+(function initHeroScene() {
+  if (typeof THREE === 'undefined') return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  var canvas = document.getElementById('hero-canvas');
+  if (!canvas) return;
+
+  var scene    = new THREE.Scene();
+  var W = window.innerWidth, H = window.innerHeight;
+  var camera   = new THREE.PerspectiveCamera(60, W / H, 0.1, 100);
+  camera.position.z = 8;
+
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  /* ── Wireframe Diamond shapes (octahedra) ── */
+  var shapes = [];
+  var octBase = new THREE.OctahedronGeometry(1, 0);
+  var edgeBase = new THREE.EdgesGeometry(octBase);
+
+  var diamondData = [
+    { p: [-5.5,  2.0, -3.0], s: 0.90, o: 0.22, rx: 0.003, ry: 0.005 },
+    { p: [ 6.0, -1.5, -4.0], s: 0.60, o: 0.18, rx: 0.005, ry: 0.003 },
+    { p: [-8.0, -2.5, -1.5], s: 0.40, o: 0.14, rx: 0.007, ry: 0.006 },
+    { p: [ 3.0,  3.5, -3.0], s: 0.75, o: 0.20, rx: 0.004, ry: 0.007 },
+    { p: [-3.0, -1.5,  2.0], s: 0.30, o: 0.12, rx: 0.009, ry: 0.004 },
+    { p: [ 8.5,  1.5, -2.0], s: 0.50, o: 0.16, rx: 0.006, ry: 0.005 },
+    { p: [ 0.5, -4.0, -1.0], s: 0.80, o: 0.19, rx: 0.003, ry: 0.009 },
+    { p: [-6.0,  0.5, -5.0], s: 0.35, o: 0.11, rx: 0.008, ry: 0.003 },
+    { p: [ 4.5, -2.5,  1.0], s: 0.25, o: 0.10, rx: 0.010, ry: 0.007 },
+    { p: [-1.0,  3.5, -6.0], s: 1.10, o: 0.24, rx: 0.002, ry: 0.004 },
+    { p: [ 2.0, -5.0, -3.0], s: 0.45, o: 0.13, rx: 0.007, ry: 0.008 },
+    { p: [-4.0,  4.5, -2.0], s: 0.55, o: 0.17, rx: 0.005, ry: 0.006 },
+  ];
+
+  diamondData.forEach(function(d, i) {
+    var mat  = new THREE.LineBasicMaterial({ color: 0xEFDF00, transparent: true, opacity: d.o });
+    var mesh = new THREE.LineSegments(edgeBase.clone(), mat);
+    mesh.position.set(d.p[0], d.p[1], d.p[2]);
+    mesh.scale.setScalar(d.s);
+    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    mesh.userData = {
+      isDiamond: true,
+      rx: d.rx * (Math.random() > 0.5 ? 1 : -1),
+      ry: d.ry * (Math.random() > 0.5 ? 1 : -1),
+      baseY: d.p[1],
+      amp: 0.15 + Math.random() * 0.25,
+      spd: 0.35 + Math.random() * 0.55,
+      off: (i / diamondData.length) * Math.PI * 2,
+    };
+    scene.add(mesh);
+    shapes.push(mesh);
+  });
+
+  /* ── Particle field ── */
+  var ptCount = 500;
+  var ptPos   = new Float32Array(ptCount * 3);
+  for (var i = 0; i < ptCount; i++) {
+    ptPos[i * 3]     = (Math.random() - 0.5) * 42;
+    ptPos[i * 3 + 1] = (Math.random() - 0.5) * 22;
+    ptPos[i * 3 + 2] = (Math.random() - 0.5) * 18;
+  }
+  var ptGeo = new THREE.BufferGeometry();
+  ptGeo.setAttribute('position', new THREE.BufferAttribute(ptPos, 3));
+  var ptMat = new THREE.PointsMaterial({ color: 0xEFDF00, size: 0.055, transparent: true, opacity: 0.45 });
+  var particles = new THREE.Points(ptGeo, ptMat);
+  scene.add(particles);
+
+  /* ── Large depth rings ── */
+  var ringData = [
+    { r: 12, t: 0.018, x:  0, y: 0,  z: -9, rx: 1.2, ry: 0.3, o: 0.07, rspd: 0.0008 },
+    { r:  8, t: 0.012, x:  3, y: -2, z: -5, rx: 0.8, ry: 0.5, o: 0.05, rspd: 0.0012 },
+  ];
+  ringData.forEach(function(rd) {
+    var geo  = new THREE.TorusGeometry(rd.r, rd.t, 6, 90);
+    var mat  = new THREE.MeshBasicMaterial({ color: 0xEFDF00, transparent: true, opacity: rd.o });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(rd.x, rd.y, rd.z);
+    mesh.rotation.set(rd.rx, rd.ry, 0);
+    mesh.userData = { isRing: true, rspd: rd.rspd };
+    scene.add(mesh);
+    shapes.push(mesh);
+  });
+
+  /* ── Mouse parallax ── */
+  var mx = 0, my = 0, cx = 0, cy = 0;
+  window.addEventListener('mousemove', function(e) {
+    mx = (e.clientX / window.innerWidth  - 0.5) *  2;
+    my = (e.clientY / window.innerHeight - 0.5) * -2;
+  });
+
+  /* ── Animation loop ── */
+  function animate() {
+    requestAnimationFrame(animate);
+    var t = Date.now() * 0.001;
+
+    shapes.forEach(function(s) {
+      if (s.userData.isDiamond) {
+        s.rotation.x += s.userData.rx;
+        s.rotation.y += s.userData.ry;
+        s.position.y  = s.userData.baseY
+          + Math.sin(t * s.userData.spd + s.userData.off) * s.userData.amp;
+      } else if (s.userData.isRing) {
+        s.rotation.z += s.userData.rspd;
+      }
+    });
+
+    /* Very slow particle drift */
+    particles.rotation.y = t * 0.018;
+
+    /* Smooth camera parallax */
+    cx += (mx * 0.7 - cx) * 0.042;
+    cy += (my * 0.45 - cy) * 0.042;
+    camera.position.x = cx;
+    camera.position.y = cy;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  /* ── Resize ── */
+  window.addEventListener('resize', function() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+
+
+/* ══════════════════════════════════════════════════════════
+   VANILLA TILT — 3D Card Tilt with glare
+══════════════════════════════════════════════════════════ */
+(function initTilt() {
+  if (typeof VanillaTilt === 'undefined') return;
+
+  /* Project cards — prominent tilt + glare */
+  VanillaTilt.init(document.querySelectorAll('.proj-card'), {
+    max: 9,
+    speed: 380,
+    glare: true,
+    'max-glare': 0.10,
+    gyroscope: false,
+    scale: 1.025,
+  });
+
+  /* Skill categories — subtle tilt */
+  VanillaTilt.init(document.querySelectorAll('.skill-cat'), {
+    max: 5,
+    speed: 500,
+    glare: false,
+    gyroscope: false,
+  });
+
+  /* Education card */
+  VanillaTilt.init(document.querySelectorAll('.edu-card'), {
+    max: 4,
+    speed: 600,
+    glare: true,
+    'max-glare': 0.06,
+    gyroscope: false,
+  });
+
+  /* Research / leadership blocks */
+  VanillaTilt.init(document.querySelectorAll('.pub-block, .lead-block'), {
+    max: 4,
+    speed: 600,
+    glare: false,
+    gyroscope: false,
+  });
+
+  /* Contact cards */
+  VanillaTilt.init(document.querySelectorAll('.contact-card'), {
+    max: 5,
+    speed: 450,
+    glare: false,
+    gyroscope: false,
+  });
+})();
+
+
+/* ══════════════════════════════════════════════════════════
+   GSAP + ScrollTrigger — Scroll-driven animations
+══════════════════════════════════════════════════════════ */
+(function initGSAP() {
+  if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* Hero content drifts up + fades as you scroll away */
+  gsap.to('.hero-content', {
+    scrollTrigger: {
+      trigger: '#hero',
+      start: 'top top',
+      end: 'bottom top',
+      scrub: 1.4,
+    },
+    y: -110,
+    opacity: 0,
+  });
+
+  /* Canvas parallax — slower than content */
+  gsap.to('#hero-canvas', {
+    scrollTrigger: {
+      trigger: '#hero',
+      start: 'top top',
+      end: 'bottom top',
+      scrub: 2.2,
+    },
+    y: -55,
+  });
+
+  /* Section labels — slide in from left */
+  gsap.utils.toArray('.section-label').forEach(function(el) {
+    gsap.from(el, {
+      scrollTrigger: { trigger: el, start: 'top 90%' },
+      x: -24,
+      opacity: 0,
+      duration: 0.65,
+      ease: 'power2.out',
+    });
+  });
+
+  /* Section titles — slide in from left, slight delay after label */
+  gsap.utils.toArray('.section-title').forEach(function(el) {
+    gsap.from(el, {
+      scrollTrigger: { trigger: el, start: 'top 88%' },
+      x: -30,
+      opacity: 0,
+      duration: 0.8,
+      delay: 0.15,
+      ease: 'power3.out',
+    });
+  });
+
+  /* Project cards — stagger up */
+  gsap.utils.toArray('.proj-card').forEach(function(el, i) {
+    gsap.from(el, {
+      scrollTrigger: { trigger: el, start: 'top 92%' },
+      y: 50,
+      opacity: 0,
+      duration: 0.7,
+      delay: (i % 3) * 0.12,
+      ease: 'power2.out',
+    });
+  });
+
+  /* Timeline items — slide from left */
+  gsap.utils.toArray('.tl-item').forEach(function(el, i) {
+    gsap.from(el, {
+      scrollTrigger: { trigger: el, start: 'top 88%' },
+      x: -40,
+      opacity: 0,
+      duration: 0.75,
+      delay: i * 0.15,
+      ease: 'power3.out',
+    });
+  });
+
+  /* Cert items — stagger fade up in pairs */
+  gsap.utils.toArray('.cert-item').forEach(function(el, i) {
+    gsap.from(el, {
+      scrollTrigger: { trigger: el, start: 'top 92%' },
+      y: 30,
+      opacity: 0,
+      duration: 0.55,
+      delay: (i % 4) * 0.08,
+      ease: 'power2.out',
+    });
+  });
+
+  /* Stat cells — pop in */
+  gsap.utils.toArray('.stat-cell').forEach(function(el, i) {
+    gsap.from(el, {
+      scrollTrigger: { trigger: el, start: 'top 90%' },
+      y: 20,
+      opacity: 0,
+      duration: 0.55,
+      delay: i * 0.1,
+      ease: 'back.out(1.4)',
+    });
+  });
+
+})();
 </script>
 </body>
 </html>
